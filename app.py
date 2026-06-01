@@ -12,43 +12,71 @@ data = yf.download(
     period="5y",
     auto_adjust=True
 )
-# 去掉第二层列 
-data.columns = data.columns.droplevel(1)
+# 如果是多层列则降级
+if isinstance(data.columns, pd.MultiIndex):
+    data.columns = data.columns.droplevel(1)
+
+# 计算均线
+data["MA25"] = data["Close"].rolling(25).mean()
+data["MA100"] = data["Close"].rolling(100).mean()
+
 
 # 后台打印
-print("========== DATA ==========")
-print(data)
+# print("========== DATA ==========")
+# print(data)
 
-print("========== COLUMNS ==========")
-print(data.columns)
+# print("========== COLUMNS ==========")
+# print(data.columns)
 
-print("========== HEAD ==========")
-print(data.head())
+# print("========== HEAD ==========")
+# print(data.head())
 
-print("========== TAIL ==========")
-print(data.tail())
+# print("========== TAIL ==========")
+# print(data.tail())
 
-print("========== INFO ==========")
-print(data.info())
+# print("========== INFO ==========")
+# print(data.info())
+
 
 # 创建图表
 fig = go.Figure()
 
-# 折线图
+# Close价格
 fig.add_trace(
     go.Scatter(
-        x=data.index,          # 横轴 Date
-        y=data["Close"],       # 纵轴 Close
+        x=data.index,
+        y=data["Close"],
         mode="lines",
-        name="Close"
+        name="S&P500"
     )
 )
 
-# 设置标题
+# MA25
+fig.add_trace(
+    go.Scatter(
+        x=data.index,
+        y=data["MA25"],
+        mode="lines",
+        name="MA25"
+    )
+)
+
+# MA100
+fig.add_trace(
+    go.Scatter(
+        x=data.index,
+        y=data["MA100"],
+        mode="lines",
+        name="MA100"
+    )
+)
+
+# 图表布局
 fig.update_layout(
-    title="SPY Chart",
+    title="SPY Chart with Moving Averages",
     xaxis_title="Date",
-    yaxis_title="Close"
+    yaxis_title="Price",
+    template="plotly_dark"
 )
 
 # 显示图表
