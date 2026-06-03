@@ -48,7 +48,15 @@ fig.update_layout(
     xaxis_title="Date",
     yaxis_title="Return (%)",
     hovermode="x unified",
-    template="plotly_dark"
+    template="plotly_dark",
+
+    legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.2,
+        xanchor="center",
+        x=0.5
+    )
 )
 
 st.plotly_chart(fig, use_container_width=True)

@@ -59,7 +59,15 @@ fig.update_layout(
     title="SPY Chart with Moving Averages",
     xaxis_title="Date",
     yaxis_title="Price",
-    template="plotly_dark"
+    template="plotly_dark",
+
+    legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.2,
+        xanchor="center",
+        x=0.5
+    )
 )
 
 # 显示图表
