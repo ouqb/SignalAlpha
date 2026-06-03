@@ -21,23 +21,6 @@ data["MA25"] = data["Close"].rolling(25).mean()
 data["MA100"] = data["Close"].rolling(100).mean()
 
 
-# 后台打印
-# print("========== DATA ==========")
-# print(data)
-
-# print("========== COLUMNS ==========")
-# print(data.columns)
-
-# print("========== HEAD ==========")
-# print(data.head())
-
-# print("========== TAIL ==========")
-# print(data.tail())
-
-# print("========== INFO ==========")
-# print(data.info())
-
-
 # 创建图表
 fig = go.Figure()
 
