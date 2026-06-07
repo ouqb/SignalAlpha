@@ -28,6 +28,10 @@ asset_map = {
     "512890.SS": "中证红利低波(JPY计价)",
     "JPY=X": "USD/JPY",
     "CNYJPY=X": "CNY/JPY",
+    "CHF=X": "USD/CHF",
+    "CHFJPY=X": "CHF/JPY",
+    "GBPEUR=X": "GBP/EUR",
+    "AUDNZD=X": "AUD/NZD",
 }
 
 # ======================
@@ -90,8 +94,9 @@ selected_assets = list(dict.fromkeys(selected_assets))
 
 period = st.selectbox(
     "Select period",
-    ["1y", "3y", "5y", "10y", "max"],
-    index=2
+    #["1y", "3y", "5y", "10y", "max"],
+    ["1mo","3mo","1y", "3y", "5y"],
+    index=1
 )
 
 
@@ -184,17 +189,44 @@ if "CNYJPY=X" in df.columns:
             )
 
 # ======================
+# 杠杆设置
+# ======================
+leveraged_assets = {
+    "JPY=X": 18,
+    "CNYJPY=X": 18,
+    "CHF=X": 18,
+    "CHFJPY=X": 18,
+    "GBPEUR=X": 18,
+    "AUDNZD=X": 18,
+}
+
+# ======================
 # Normalize 收益率
 # ======================
 returns = df.copy()
 
 for col in returns.columns:
 
-    first_valid = returns[col].dropna().iloc[0]
+    valid = returns[col].dropna()
 
+    # 空数据跳过
+    if len(valid) == 0:
+        continue
+
+    first_valid = valid.iloc[0]
+
+    # 默认无杠杆
+    leverage = leveraged_assets.get(col, 1)
+
+    # 收益率归一化 + 杠杆
     returns[col] = (
-        returns[col] / first_valid - 1
-    ) * 100
+        (
+            returns[col] / first_valid
+            - 1
+        )
+        * 100
+        * leverage
+    )
 
 # ======================
 # Plotly 绘图
@@ -220,6 +252,10 @@ fig.update_layout(
 
     xaxis_title="Date",
     yaxis_title="Return (%)",
+
+    yaxis=dict(
+        side="right"
+    ),
 
     legend=dict(
         orientation="h",
