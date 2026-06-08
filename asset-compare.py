@@ -1,3 +1,4 @@
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -20,7 +21,7 @@ st.title("Asset Performance Dashboard")
 asset_map = {
     "SPY": "SPY - S&P500(JPY计价)",
     "SPXL": "SPXL - 3x S&P500(JPY计价)",
-    "^N225": "Nikkei 225 (日经)",
+    "^N225": "Nikkei 225(日经)",
     "1489.T": "日经高配当50",
     "1540.T": "Gold (JPY)",
     "BTC-JPY": "Bitcoin (BTC-JPY)",
@@ -38,24 +39,35 @@ asset_map = {
 # JPY计价转换
 # ======================
 
-# 美元资产
+# USD资产
 usd_assets = [
     "SPY",
     "SPXL",
 ]
 
-# 人民币资产
+# CNY资产
 cny_assets = [
     "000300.SS",
     "512890.SS",
 ]
 
 # ======================
+# FX杠杆
+# ======================
+fx_leverage = {
+    "JPY=X": 18,
+    "CHF=X": 18,
+    "CHFJPY=X": 18,
+    "GBPEUR=X": 18,
+    "AUDNZD=X": 18,
+}
+
+# ======================
 # 必选资产
 # ======================
 required_assets = [
     "JPY=X",
-    "CNYJPY=X"
+    "CNYJPY=X",
 ]
 
 # ======================
@@ -73,6 +85,7 @@ default_assets = options_list.copy()
 # 参数区
 # ======================
 st.caption("Base FX pairs (always enabled)")
+
 required_labels = [
     asset_map.get(asset, asset)
     for asset in required_assets
@@ -94,11 +107,9 @@ selected_assets = list(dict.fromkeys(selected_assets))
 
 period = st.selectbox(
     "Select period",
-    #["1y", "3y", "5y", "10y", "max"],
-    ["1mo","3mo","1y", "3y", "5y"],
+    ["1mo", "3mo", "1y", "3y", "5y"],
     index=1
 )
-
 
 # ======================
 # 检查资产
@@ -108,46 +119,58 @@ if len(selected_assets) == 0:
     st.stop()
 
 # ======================
-# 下载数据（批量）
+# 数据下载函数
+# ======================
+@st.cache_data(ttl=3600)
+def load_data(assets, period):
+
+    raw = yf.download(
+        assets,
+        period=period,
+        auto_adjust=True,
+        progress=False,
+        group_by="ticker"
+    )
+
+    data = {}
+
+    # 多资产
+    if len(assets) > 1:
+
+        for ticker in assets:
+
+            try:
+
+                close_series = raw[ticker]["Close"]
+
+                if not close_series.empty:
+                    data[ticker] = close_series
+
+            except Exception:
+                pass
+
+    # 单资产
+    else:
+
+        ticker = assets[0]
+
+        data[ticker] = raw["Close"]
+
+    df = pd.concat(data, axis=1)
+
+    return df
+
+# ======================
+# 下载数据
 # ======================
 with st.spinner("Downloading market data..."):
 
     try:
 
-        raw = yf.download(
+        df = load_data(
             selected_assets,
-            period=period,
-            auto_adjust=True,
-            progress=False,
-            group_by="ticker"
+            period
         )
-
-        data = {}
-
-        # 多资产
-        if len(selected_assets) > 1:
-
-            for ticker in selected_assets:
-
-                try:
-
-                    close_series = raw[ticker]["Close"]
-
-                    if not close_series.empty:
-                        data[ticker] = close_series
-
-                except Exception:
-                    st.warning(f"No data: {ticker}")
-
-        # 单资产
-        else:
-
-            ticker = selected_assets[0]
-
-            data[ticker] = raw["Close"]
-
-        # 合并
-        df = pd.concat(data, axis=1)
 
     except Exception as e:
 
@@ -155,81 +178,88 @@ with st.spinner("Downloading market data..."):
         st.stop()
 
 # ======================
-# 缺失值处理
+# 数据整理
 # ======================
+
+# 时间排序
+df = df.sort_index()
+
+# 删除重复时间
+df = df[~df.index.duplicated()]
+
+# 前值填充
 df = df.ffill()
 
 # 删除全空列
 df = df.dropna(axis=1, how="all")
 
-# 如果仍为空
 if df.empty:
     st.error("No valid market data.")
     st.stop()
 
 # ======================
-# 资产转换为JPY计价
+# JPY计价转换
 # ======================
+
 # USD -> JPY
 if "JPY=X" in df.columns:
+
     usd_jpy = df["JPY=X"]
+
     for asset in usd_assets:
+
         if asset in df.columns:
+
             df[asset] = (
                 df[asset] * usd_jpy
             )
 
 # CNY -> JPY
 if "CNYJPY=X" in df.columns:
+
     cny_jpy = df["CNYJPY=X"]
+
     for asset in cny_assets:
+
         if asset in df.columns:
+
             df[asset] = (
                 df[asset] * cny_jpy
             )
 
 # ======================
-# 杠杆设置
+# 收益率曲线
 # ======================
-leveraged_assets = {
-    "JPY=X": 18,
-    "CNYJPY=X": 18,
-    "CHF=X": 18,
-    "CHFJPY=X": 18,
-    "GBPEUR=X": 18,
-    "AUDNZD=X": 18,
-}
+returns = pd.DataFrame(index=df.index)
 
-# ======================
-# Normalize 收益率
-# ======================
-returns = df.copy()
+for col in df.columns:
 
-for col in returns.columns:
+    series = df[col].dropna()
 
-    valid = returns[col].dropna()
-
-    # 空数据跳过
-    if len(valid) == 0:
+    if len(series) < 2:
         continue
 
-    first_valid = valid.iloc[0]
+    leverage = fx_leverage.get(col, 1)
 
-    # 默认无杠杆
-    leverage = leveraged_assets.get(col, 1)
-
-    # 收益率归一化 + 杠杆
-    returns[col] = (
-        (
-            returns[col] / first_valid
-            - 1
-        )
-        * 100
-        * leverage
+    # 日收益率
+    daily_returns = (
+        series.pct_change().fillna(0)
     )
 
+    # 杠杆收益
+    leveraged_daily = (
+        daily_returns * leverage
+    )
+
+    # 累计收益率
+    cumulative = (
+        (1 + leveraged_daily).cumprod() - 1
+    ) * 100
+
+    returns[col] = cumulative
+
 # ======================
-# Plotly 绘图
+# 绘图
 # ======================
 fig = go.Figure()
 
@@ -274,45 +304,43 @@ st.plotly_chart(
 # ======================
 # 指标计算
 # ======================
-
 metrics = pd.DataFrame()
 
-for col in df.columns:
+for col in returns.columns:
 
-    series = df[col].dropna()
+    series = returns[col].dropna()
 
-    # 数据太少跳过
     if len(series) < 2:
         continue
 
+    # 总收益
+    total_return = series.iloc[-1]
+
+    # 恢复净值曲线
+    equity = (
+        1 + series / 100
+    )
+
     # 日收益率
-    daily_returns = series.pct_change().dropna()
+    daily_returns = (
+        equity.pct_change().dropna()
+    )
 
-    # 实际年数
-    years = (
-        (series.index[-1] - series.index[0]).days
-    ) / 365.25
-
-    # CAGR
-    cagr = (
-        (series.iloc[-1] / series.iloc[0]) ** (1 / years) - 1
-    ) * 100
-
-    # Volatility
+    # 波动率
     vol = (
         daily_returns.std() * np.sqrt(252)
     ) * 100
 
     # Sharpe
     sharpe = (
-        (cagr / 100) / (vol / 100)
-    ) if vol != 0 else np.nan
+        daily_returns.mean() / daily_returns.std()
+    ) * np.sqrt(252)
 
-    # Max Drawdown
-    rolling_max = series.cummax()
+    # 最大回撤
+    rolling_max = equity.cummax()
 
     drawdown = (
-        series / rolling_max - 1
+        equity / rolling_max - 1
     )
 
     max_dd = (
@@ -321,10 +349,10 @@ for col in df.columns:
 
     # Calmar
     calmar = (
-        abs(cagr / max_dd)
+        total_return / abs(max_dd)
     ) if max_dd != 0 else np.nan
 
-    metrics.loc[col, "CAGR %"] = cagr
+    metrics.loc[col, "Total Return %"] = total_return
     metrics.loc[col, "Volatility %"] = vol
     metrics.loc[col, "Sharpe"] = sharpe
     metrics.loc[col, "Max Drawdown %"] = max_dd
@@ -332,6 +360,12 @@ for col in df.columns:
 
 # 保留两位小数
 metrics = metrics.round(2)
+
+# 按总收益排序
+metrics = metrics.sort_values(
+    by="Total Return %",
+    ascending=False
+)
 
 # 替换显示名称
 metrics.index = [
@@ -348,3 +382,4 @@ st.dataframe(
     metrics,
     use_container_width=True
 )
+
