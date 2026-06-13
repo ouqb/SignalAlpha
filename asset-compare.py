@@ -55,11 +55,11 @@ cny_assets = [
 # FX杠杆
 # ======================
 fx_leverage = {
-    "JPY=X": 18,
-    "CHF=X": 18,
-    "CHFJPY=X": 18,
-    "GBPEUR=X": 18,
-    "AUDNZD=X": 18,
+    "JPY=X": 6,
+    "CHF=X": 6,
+    "CHFJPY=X": 6,
+    "GBPEUR=X": 6,
+    "AUDNZD=X": 6,
 }
 
 # ======================
@@ -110,6 +110,21 @@ period = st.selectbox(
     ["1mo", "3mo", "1y", "3y", "5y"],
     index=1
 )
+
+leverage_map = {}
+
+st.sidebar.subheader("Leverage")
+
+for asset in selected_assets:
+
+    leverage_map[asset] = st.sidebar.number_input(
+        asset_map.get(asset, asset),
+        min_value=0.0,
+        max_value=100.0,
+        value=float(fx_leverage.get(asset, 1)),
+        step=0.5,
+        key=f"leverage_{asset}"
+    )
 
 # ======================
 # 检查资产
@@ -239,7 +254,7 @@ for col in df.columns:
     if len(series) < 2:
         continue
 
-    leverage = fx_leverage.get(col, 1)
+    leverage = leverage_map.get(col, 1)
 
     # 日收益率
     daily_returns = (
@@ -296,11 +311,6 @@ fig.update_layout(
     )
 )
 
-st.plotly_chart(
-    fig,
-    use_container_width=True
-)
-
 # ======================
 # 指标计算
 # ======================
@@ -352,6 +362,7 @@ for col in returns.columns:
         total_return / abs(max_dd)
     ) if max_dd != 0 else np.nan
 
+    metrics.loc[col, "Leverage"] = leverage_map.get(col, 1)
     metrics.loc[col, "Total Return %"] = total_return
     metrics.loc[col, "Volatility %"] = vol
     metrics.loc[col, "Sharpe"] = sharpe
@@ -380,6 +391,11 @@ st.subheader("Performance Metrics")
 
 st.dataframe(
     metrics,
+    use_container_width=True
+)
+
+st.plotly_chart(
+    fig,
     use_container_width=True
 )
 
