@@ -96,7 +96,8 @@ st.write(", ".join(required_labels))
 selected_assets = st.multiselect(
     "Select assets",
     options=options_list,
-    default=default_assets
+    default=default_assets,
+    format_func=lambda asset: asset_map.get(asset, asset)
 )
 
 # 自动加入必选资产
