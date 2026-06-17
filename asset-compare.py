@@ -136,7 +136,7 @@ else:
 
 # st.write(", ".join(required_labels))
 
-selected_assets = st.multiselect(
+selected_display_assets = st.multiselect(
     "Select assets",
     options=options_list,
     default=default_assets,
@@ -144,6 +144,7 @@ selected_assets = st.multiselect(
 )
 
 # 自动加入必选资产
+selected_assets = selected_display_assets.copy()
 selected_assets += required_assets
 
 # 去重
@@ -159,7 +160,7 @@ leverage_map = {}
 
 st.sidebar.subheader("Leverage")
 
-for asset in selected_assets:
+for asset in selected_display_assets:
 
     leverage_map[asset] = st.sidebar.number_input(
         asset_map.get(asset, asset),
@@ -170,10 +171,14 @@ for asset in selected_assets:
         key=f"leverage_{asset}"
     )
 
+for asset in required_assets:
+
+    leverage_map.setdefault(asset, fx_leverage.get(asset, 1))
+
 # ======================
 # 检查资产
 # ======================
-if len(selected_assets) == 0:
+if len(selected_display_assets) == 0:
     st.warning("Please select at least one asset.")
     st.stop()
 
@@ -320,7 +325,7 @@ for col in df.columns:
 display_assets = [
     col
     for col in returns.columns
-    if col in asset_map
+    if col in selected_display_assets
 ]
 
 # ======================
