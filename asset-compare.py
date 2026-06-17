@@ -35,6 +35,39 @@ asset_map = {
     "AUDNZD=X": "AUD/NZD",
 }
 
+if hasattr(st, "query_params"):
+
+    raw_asset_params = st.query_params.get_all("asset_map")
+
+else:
+
+    raw_asset_params = st.experimental_get_query_params().get("asset_map", [])
+
+url_assets = []
+
+for raw_param in raw_asset_params:
+
+    for asset in str(raw_param).split(","):
+
+        asset = asset.strip()
+
+        if asset:
+            url_assets.append(asset)
+
+if url_assets:
+
+    missing_assets = [
+        asset
+        for asset in url_assets
+        if asset not in asset_map
+    ]
+
+    if missing_assets:
+        st.warning(
+            "Ignored unknown asset_map URL parameter(s): "
+            + ", ".join(missing_assets)
+        )
+
 # ======================
 # JPY计价转换
 # ======================
@@ -76,22 +109,32 @@ required_assets = [
 options_list = [
     asset
     for asset in asset_map.keys()
-    if asset not in required_assets
+    #if asset not in required_assets
 ]
 
-default_assets = options_list.copy()
+if url_assets:
+
+    default_assets = [
+        asset
+        for asset in dict.fromkeys(url_assets)
+        if asset in options_list
+    ]
+
+else:
+
+    default_assets = options_list.copy()
 
 # ======================
 # 参数区
 # ======================
-st.caption("Base FX pairs (always enabled)")
+# st.caption("Base FX pairs (always enabled)")
 
-required_labels = [
-    asset_map.get(asset, asset)
-    for asset in required_assets
-]
+# required_labels = [
+#     asset_map.get(asset, asset)
+#     for asset in required_assets
+# ]
 
-st.write(", ".join(required_labels))
+# st.write(", ".join(required_labels))
 
 selected_assets = st.multiselect(
     "Select assets",
@@ -274,12 +317,18 @@ for col in df.columns:
 
     returns[col] = cumulative
 
+display_assets = [
+    col
+    for col in returns.columns
+    if col in asset_map
+]
+
 # ======================
 # 绘图
 # ======================
 fig = go.Figure()
 
-for col in returns.columns:
+for col in display_assets:
 
     fig.add_trace(
         go.Scatter(
@@ -317,7 +366,7 @@ fig.update_layout(
 # ======================
 metrics = pd.DataFrame()
 
-for col in returns.columns:
+for col in display_assets:
 
     series = returns[col].dropna()
 
