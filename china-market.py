@@ -7,6 +7,8 @@ symbols = {
     "沪深300": "000300.SS",
     "红利低波ETF": "512890.SS",
     "黄金ETF": "518880.SS",
+    "标普500": "^GSPC",
+    "美元兑人民币": "CNY=X",
 }
 
 period = st.selectbox(
@@ -22,10 +24,13 @@ df = yf.download(
     progress=False
 )["Close"]
 
-df = df.dropna()
-
 # 改成中文列名
-df.columns = symbols.keys()
+df = df.rename(columns={symbol: name for name, symbol in symbols.items()})
+
+# 用美元标普500乘以美元兑人民币汇率，得到人民币计价的标普500
+df["人民币计价标普500"] = df["标普500"] * df["美元兑人民币"]
+df = df.drop(columns=["标普500", "美元兑人民币"])
+df = df.dropna()
 
 # 转换为累计收益率(%)
 returns = (df / df.iloc[0] - 1) * 100
@@ -68,12 +73,15 @@ fig.update_layout(
     xaxis_title="日期",
     yaxis_title="收益率 (%)",
     hovermode="x unified",
+    margin=dict(b=110),
     legend=dict(
         orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="right",
-        x=1
+        yanchor="top",
+        y=-0.4,
+        xanchor="left",
+        x=0,
+        entrywidth=0.5,
+        entrywidthmode="fraction",
     )
 )
 
