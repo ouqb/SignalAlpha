@@ -208,11 +208,19 @@ fig.update_layout(
     ),
 )
 
+fig.update_layout(
+    hovermode=False
+)
+
+fig.update_xaxes(fixedrange=True)
+fig.update_yaxes(fixedrange=True)
+
 st.plotly_chart(
     fig,
     use_container_width=True,
     config={
-        "staticPlot": True,
         "displayModeBar": False,
+        "scrollZoom": False,
+        "doubleClick": False,
     },
 )
